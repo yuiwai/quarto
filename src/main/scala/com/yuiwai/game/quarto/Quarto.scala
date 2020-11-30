@@ -4,10 +4,10 @@ import com.yuiwai.game.quarto.Quarto.{Board, Coord, Piece, Player, Pos}
 
 import scala.util.Random
 
-final case class Quarto[F[_]](
+final case class Quarto[F[_]: FlatMap](
   board: Board,
   first: Player,
-  second: Player)(using decider: Decider[F], F: FlatMap[F]):
+  second: Player)(using decider: Decider[F]):
   def next: F[QuartoResult[F]] =
     for {
       piece <- decider.give(this)
