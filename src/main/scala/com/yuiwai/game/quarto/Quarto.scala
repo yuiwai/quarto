@@ -14,12 +14,14 @@ final case class Quarto[F[_]: FlatMap](
       piece <- decider.give(this)
       pos <- decider.put(this, piece)
     } yield put(pos, piece)
+  def nextAll(piece: Piece): Set[QuartoResult[F]] =
+    board.spaces.toSet.map(put(_, piece))  
   private def put(pos: Pos, piece: Piece): QuartoResult[F] =
     second.release(piece).map { p =>
       board.put(pos, piece) match
         case PutResult.Success(b) =>
           if b.lines.exists(_.isQuarto) then
-            QuartoResult.Finished(piece.color, copy(b, p, first))
+            QuartoResult.Finished(piece.color, copy(b, p, first), pos)
           else QuartoResult.Processing(copy(b, p, first))
         case PutResult.AlreadyExists(_) =>
           QuartoResult.Error()
@@ -28,7 +30,10 @@ final case class Quarto[F[_]: FlatMap](
 enum QuartoResult[F[_]]:
   case Error() // TODO エラーを分類
   case Processing(quarto: Quarto[F])
-  case Finished(winner: Color, quarto: Quarto[F])
+  case Finished(winner: Color, quarto: Quarto[F], pos: Pos)
+  def isFinished: Boolean = this match
+    case Finished(_, _, _) => true
+    case _ => false
 
 object Quarto:
   type Coord = 0 | 1 | 2 | 3
@@ -39,10 +44,13 @@ object Quarto:
   opaque type Line = Seq[Piece]
   private val EMPTY = 0
   private val HAS_HOLE = 1
-  private val IS_TALL = 2
-  private val IS_SQUARE = 4
-  private val IS_BLACK = 8
-  private val IS_EXISTS = 16
+  private val IS_FLAT = 2
+  private val IS_SHORT = 4
+  private val IS_TALL = 8
+  private val IS_SQUARE = 16
+  private val IS_CIRCLE = 32
+  private val IS_BLACK = 64
+  private val IS_WHITE = 128
   private val LINE_LENGTH = 4
   private val PIECE_PATTERNS = 16
   val coords: Seq[Coord] = Seq(0, 1, 2, 3)
@@ -62,9 +70,13 @@ object Quarto:
   object Piece:
     def empty: Piece = EMPTY
     def apply(face: Face, height: Height, shape: Shape, color: Color): Piece =
-      IS_EXISTS.withFace(face).withHeight(height).withShape(shape).withColor(color)
-    def all(color: Color): Set[Piece] =
-      Set.tabulate(PIECE_PATTERNS / 2)(i => i.withColor(color) | IS_EXISTS)
+      EMPTY.withFace(face).withHeight(height).withShape(shape).withColor(color)
+    def all(color: Color): Set[Piece] = 
+      for {
+        face <- Set(HAS_HOLE, IS_FLAT)
+        height <- Set(IS_TALL, IS_SHORT)
+        shape <- Set(IS_SQUARE, IS_CIRCLE)
+      } yield (face | height | shape).withColor(color) 
 
   object Pos:
     def apply(x: Coord, y: Coord): Pos = (x, y)
@@ -80,25 +92,25 @@ object Quarto:
     def color: Color = if isBlack then Color.Black else Color.White
     def hasHole: Boolean = (piece & HAS_HOLE) != 0
     def isTall: Boolean = (piece & IS_TALL) != 0
-    def isShort: Boolean = !isTall
+    def isShort: Boolean = (piece & IS_SHORT) != 0
     def isSquare: Boolean = (piece & IS_SQUARE) != 0
-    def isCircle: Boolean = !isSquare
+    def isCircle: Boolean = (piece & IS_CIRCLE) != 0
     def isBlack: Boolean = (piece & IS_BLACK) != 0
-    def isWhite: Boolean = !isBlack
-    def exists: Boolean = (piece & IS_EXISTS) != 0
-    def isEmpty: Boolean = !exists
+    def isWhite: Boolean = (piece & IS_WHITE) != 0
+    def exists: Boolean = piece != EMPTY
+    def isEmpty: Boolean = piece == EMPTY
     def withFace(face: Face): Piece = face match
-      case Face.Hole => piece | HAS_HOLE
-      case Face.Flat => piece & ~HAS_HOLE
+      case Face.Hole => piece | HAS_HOLE & ~IS_FLAT
+      case Face.Flat => piece | IS_FLAT & ~HAS_HOLE
     def withHeight(height: Height): Piece = height match
-      case Height.Tall => piece | IS_TALL
-      case Height.Short => piece & ~IS_TALL
+      case Height.Tall => piece | IS_TALL & ~IS_SHORT
+      case Height.Short => piece | IS_SHORT & ~IS_TALL
     def withShape(shape: Shape): Piece = shape match
-      case Shape.Square => piece | IS_SQUARE
-      case Shape.Circle => piece & ~IS_SQUARE
+      case Shape.Square => piece | IS_SQUARE & ~IS_CIRCLE
+      case Shape.Circle => piece | IS_CIRCLE & ~IS_SQUARE
     def withColor(color: Color): Piece = color match
-      case Color.Black => piece | IS_BLACK
-      case Color.White => piece & ~IS_BLACK
+      case Color.Black => piece | IS_BLACK & ~IS_WHITE
+      case Color.White => piece | IS_WHITE & ~IS_BLACK
 
   extension(pos: Pos):
     def x: Coord = pos._1
@@ -107,6 +119,8 @@ object Quarto:
 
   extension(line: Line):
     def isQuarto: Boolean = line.reduce(_ & _) != 0
+    def isFilled: Boolean = line.forall(_ != EMPTY)
+    def isReach: Boolean = line.count(_ != EMPTY) == 3 && line.filter(_ != EMPTY).reduce(_ & _) != 0
 
   extension(board: Board):
     def spaces: Seq[Pos] = board.zipWithIndex.filter(_._1.isEmpty).map(t => Pos.fromIndex(t._2))
