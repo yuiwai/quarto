@@ -1,4 +1,4 @@
-import com.yuiwai.game.quarto.{Color, Decider, Face, Height, Quarto, Shape, PutResult, QuartoResult}
+import com.yuiwai.game.quarto.{Color, CompositeDecider, Decider, Face, Height, PutResult, Quarto, QuartoResult, RandomDecider, Shape}
 import com.yuiwai.game.quarto.Quarto.{Board, Line, Piece, Pos}
 
 object Main {
@@ -15,6 +15,7 @@ object Main {
     lineSpec
     boardSpec
     quartoSpec
+    evaluate(RandomDecider.decider, RandomDecider.decider)
   }
 
   def posSpec = {
@@ -58,6 +59,7 @@ object Main {
   def quartoSpec = {
     import com.yuiwai.game.quarto.RandomDecider.given
     val quarto = Quarto.init()
+    assert(quarto.turn == Some(Color.White))
     quarto.next match
       case QuartoResult.Processing(q1) =>
         // 持ち駒が減っている(手番も変わっている)
@@ -65,15 +67,6 @@ object Main {
         // Boardにコマが1つ置かれている
         assert(q1.board.spaces.size == 15)
       case _ => ???
-
-    // 決着まで実行
-    def run(q: Quarto[[T] =>> T]): QuartoResult[[T] =>> T] = {
-      q.next match
-        case QuartoResult.Processing(q1) => run(q1)
-        case r as QuartoResult.Finished(_, _) => r
-        case _ => ???
-    }
-    println(run(quarto))
   }
 
   def checkContainAllPieceOnce(pieces: Iterable[Piece]) =
@@ -85,4 +78,22 @@ object Main {
     assert(pieces.count(p => !p.hasHole && p.isTall && p.isCircle) == 1) // 穴なし, 高, 丸
     assert(pieces.count(p => !p.hasHole && p.isShort && p.isSquare) == 1) // 穴なし, 低, 四角
     assert(pieces.count(p => !p.hasHole && p.isShort && p.isCircle) == 1) // 穴なし, 低, 丸
+
+  // 決着まで実行
+  def run(q: Quarto[[T] =>> T]): QuartoResult[[T] =>> T] = {
+      q.next match
+        case QuartoResult.Processing(q1) => run(q1)
+        case r as QuartoResult.Finished(_, _) => r
+        case _ => ???
+    }
+  
+  def evaluate(black: Decider[[T] =>> T], white: Decider[[T] =>> T], numOfEval: Int = 1000): Unit = {
+    given Decider[[T] =>> T] = CompositeDecider(black, white)
+    val quarto = Quarto.init()
+    val result = (1 to numOfEval).map(_ => run(quarto)).foldLeft(Map.empty[Color, Int]) {
+      case (acc, QuartoResult.Finished(c, _)) => acc.updatedWith(c)(_.map(_ + 1).orElse(Some(0)))
+      case (acc, _) => acc
+    }
+    println(result)
+  }
 }

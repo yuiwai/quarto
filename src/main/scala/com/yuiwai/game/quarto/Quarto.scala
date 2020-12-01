@@ -8,6 +8,7 @@ final case class Quarto[F[_]: FlatMap](
   board: Board,
   first: Player,
   second: Player)(using decider: Decider[F]):
+  def turn: Option[Color] = second.color
   def next: F[QuartoResult[F]] =
     for {
       piece <- decider.give(this)
@@ -28,10 +29,6 @@ enum QuartoResult[F[_]]:
   case Error() // TODO エラーを分類
   case Processing(quarto: Quarto[F])
   case Finished(winner: Color, quarto: Quarto[F])
-
-trait Decider[F[_]]:
-  def give(quarto: Quarto[F]): F[Piece]
-  def put(quarto: Quarto[F], piece: Piece): F[Pos]
 
 object Quarto:
   type Coord = 0 | 1 | 2 | 3
@@ -128,6 +125,7 @@ object Quarto:
 
   extension(player: Player):
     def hand: Seq[Piece] = player.toSeq
+    def color: Option[Color] = player.headOption.map(_.color)
     def release(piece: Piece): Option[Player] =
       if player(piece) then Some(player - piece) else None
 
@@ -146,14 +144,6 @@ enum Color:
 enum PutResult:
   case Success(board: Board)
   case AlreadyExists(pos: Pos)
-
-object RandomDecider:
-  type F = [T] =>> T
-  given Decider[F]:
-    def give(quarto: Quarto[F]): Piece =
-      quarto.second.hand(new Random().between(0, quarto.second.hand.size))
-    def put(quarto: Quarto[F], piece: Piece): Pos =
-      quarto.board.spaces(new Random().between(0, quarto.board.spaces.size))
 
 trait FlatMap[F[_]]:
   def map[A, B](fa: F[A])(f: A => B): F[B]
