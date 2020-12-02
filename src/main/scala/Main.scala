@@ -16,7 +16,7 @@ object Main {
     lineSpec
     boardSpec
     quartoSpec
-    // evaluate(RandomDecider.decider, SimpleDecider.decider)
+    evaluate(RandomDecider.decider, SimpleDecider.decider)
   }
 
   def posSpec = {
@@ -51,7 +51,10 @@ object Main {
     assert(Line(blackPieces(0), blackPieces(1), blackPieces(2), blackPieces(3)).isFilled)
     
     assert(Line(blackPieces(0), blackPieces(1), blackPieces(2), Piece.empty).isReach)
-    // assert(!Line(p1, p2, blackPieces(2), Piece.empty).isReach)
+    assert(!Line(p1, p2, blackPieces(2), Piece.empty).isReach)
+
+    assert(!Line(blackPieces(0), blackPieces(1), blackPieces(2), Piece.empty).isDouble)
+    assert(Line(p1, Piece.empty, blackPieces(2), Piece.empty).isDouble)
   }
 
   def boardSpec = {
@@ -70,13 +73,14 @@ object Main {
     val quarto = Quarto.init()
     assert(quarto.turn == Some(Color.White))
     quarto.next match
-      case QuartoResult.Processing(q1) =>
+      case QuartoResult.Processing(q1, _) =>
         // 持ち駒が減っている(手番も変わっている)
         assert(q1.first.hand.size == 7)
         // Boardにコマが1つ置かれている
         assert(q1.board.spaces.size == 15)
       case _ => ???
-    assert(quarto.nextAll(RandomDecider.decider.give(quarto)).size == 16)
+    // FIXME Option.get
+    assert(quarto.nextAll(RandomDecider.decider.give(quarto).get).size == 16)
   }
 
   def checkContainAllPieceOnce(pieces: Iterable[Piece]) =
@@ -92,9 +96,9 @@ object Main {
   // 決着まで実行
   def run(q: Quarto[[T] =>> T]): QuartoResult[[T] =>> T] = {
       q.next match
-        case QuartoResult.Processing(q1) => run(q1)
+        case QuartoResult.Processing(q1, _) => run(q1)
         case r as QuartoResult.Finished(_, _, _) => r
-        case _ => ???
+        case r => r
     }
   
   def evaluate(black: Decider[[T] =>> T], white: Decider[[T] =>> T], numOfEval: Int = 1000): Unit = {

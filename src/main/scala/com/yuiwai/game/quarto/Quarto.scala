@@ -1,19 +1,23 @@
 package com.yuiwai.game.quarto
 
-import com.yuiwai.game.quarto.Quarto.{Board, Coord, Piece, Player, Pos}
+import com.yuiwai.game.quarto.Quarto.{Board, Coord, Line, Piece, Player, Pos}
 
 import scala.util.Random
 
-final case class Quarto[F[_]: FlatMap](
+final case class Quarto[F[_]](
   board: Board,
   first: Player,
-  second: Player)(using decider: Decider[F]):
+  second: Player)(using decider: Decider[F], F: FlatMap[F]):
   def turn: Option[Color] = second.color
-  def next: F[QuartoResult[F]] =
+  def linesFromPos(pos: Pos): Seq[Line] = Seq(board.hLines(pos.y), board.vLines(pos.x))
+  def next: F[QuartoResult[F]] = {
     for {
-      piece <- decider.give(this)
-      pos <- decider.put(this, piece)
-    } yield put(pos, piece)
+      pieceOpt <- decider.give(this)
+      posOpt <- pieceOpt.map(decider.put(this, _)).getOrElse(F.unit(None))
+    } yield (pieceOpt, posOpt) match
+      case (Some(piece), Some(pos)) => put(pos, piece)
+      case _ => QuartoResult.Draw(this)
+  }
   def nextAll(piece: Piece): Set[QuartoResult[F]] =
     board.spaces.toSet.map(put(_, piece))  
   private def put(pos: Pos, piece: Piece): QuartoResult[F] =
@@ -22,14 +26,15 @@ final case class Quarto[F[_]: FlatMap](
         case PutResult.Success(b) =>
           if b.lines.exists(_.isQuarto) then
             QuartoResult.Finished(piece.color, copy(b, p, first), pos)
-          else QuartoResult.Processing(copy(b, p, first))
+          else QuartoResult.Processing(copy(b, p, first), pos)
         case PutResult.AlreadyExists(_) =>
           QuartoResult.Error()
     }.getOrElse(QuartoResult.Error())
 
 enum QuartoResult[F[_]]:
   case Error() // TODO エラーを分類
-  case Processing(quarto: Quarto[F])
+  case Processing(quarto: Quarto[F], pos: Pos)
+  case Draw(quarto: Quarto[F])
   case Finished(winner: Color, quarto: Quarto[F], pos: Pos)
   def isFinished: Boolean = this match
     case Finished(_, _, _) => true
@@ -121,6 +126,7 @@ object Quarto:
     def isQuarto: Boolean = line.reduce(_ & _) != 0
     def isFilled: Boolean = line.forall(_ != EMPTY)
     def isReach: Boolean = line.count(_ != EMPTY) == 3 && line.filter(_ != EMPTY).reduce(_ & _) != 0
+    def isDouble: Boolean = line.count(_ != EMPTY) == 2 && line.filter(_ != EMPTY).reduce(_ & _) != 0
 
   extension(board: Board):
     def spaces: Seq[Pos] = board.zipWithIndex.filter(_._1.isEmpty).map(t => Pos.fromIndex(t._2))
@@ -160,11 +166,13 @@ enum PutResult:
   case AlreadyExists(pos: Pos)
 
 trait FlatMap[F[_]]:
+  def unit[A](a: A): F[A]
   def map[A, B](fa: F[A])(f: A => B): F[B]
   def flatMap[A, B](fa: F[A])(f: A => F[B]): F[B]
 
 object FlatMap:
   given FlatMap[[T] =>> T]:
+    def unit[A](a: A): A = a
     def map[A, B](fa: A)(f: A => B): B = f(fa)
     def flatMap[A, B](fa: A)(f: A => B): B = f(fa)
 
