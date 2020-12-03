@@ -19,27 +19,29 @@ object RandomDecider:
 
 object SimpleDecider:
   type F = [T] =>> T
+  type Score = -1 | 0 | 1 | 2 | 3 | 4 | 5
   given decider as Decider[F]:
+    // TODO 評価関数を採用する
     def give(quarto: Quarto[F]): F[Option[Piece]] =
       // TODO 相手が3を作ってしまうコマを渡す
       quarto.second.hand.find(p => !quarto.nextAll(p).exists(_.isFinished))
         .orElse(quarto.second.hand.headOption)
-    // TODO 評価関数を分離する
     def put(quarto: Quarto[F], piece: Piece): F[Option[Pos]] =
       (quarto.nextAll(piece)
         .foldLeft(RandomDecider.decider.put(quarto, piece), 0) { (acc, r) => 
           r match             
             case QuartoResult.Finished(_, _, pos) => Some(pos) -> 5
             case QuartoResult.Processing(q, pos) => 
-              val score = 
-                if quarto.linesFromPos(pos).exists(_.isReach) then 3
-                else if quarto.linesFromPos(pos).exists(_.isDouble) then 2
-                else if q.linesFromPos(pos).exists(_.isReach) then -1 
-                else 1
-              if score >= acc._2 then Some(pos) -> score else acc
+              val score = evalPut(quarto, q, pos)
+              if score > acc._2 then Some(pos) -> score else acc
             case _ => acc
         }) match
           case (r, _) => r
+    def evalPut(before: Quarto[F], after: Quarto[F], pos: Pos): Score = 
+      if before.linesFromPos(pos).exists(_.isReach) then 3 
+      else if after.linesFromPos(pos).exists(_.isDouble) then 2 
+      else if after.linesFromPos(pos).exists(_.isReach) then -1 
+      else 0
 
 final case class CompositeDecider[F[_]]
 (black: Decider[F], white: Decider[F])(using F: FlatMap[F]) extends Decider[F]:
