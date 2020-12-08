@@ -1,4 +1,4 @@
-import com.yuiwai.game.quarto.{Color, CompositeDecider, Decider, Face, Height, PutResult, Quarto, QuartoResult, RandomDecider, Shape, SimpleDecider}
+import com.yuiwai.game.quarto.{Color, CompositeDecider, Decider, Face, Height, PutResult, Quarto, QuartoResult, RandomDecider, RecursiveDecider, Shape, SimpleDecider}
 import com.yuiwai.game.quarto.Quarto.{Board, Line, Piece, Pos}
 
 // TODO 全体的に手番の概念を明確にしたい
@@ -16,7 +16,7 @@ object Main {
     lineSpec
     boardSpec
     quartoSpec
-    evaluate(RandomDecider.decider, SimpleDecider.decider)
+    evaluate(RecursiveDecider.decider, SimpleDecider.decider, 10)
   }
 
   def posSpec = {

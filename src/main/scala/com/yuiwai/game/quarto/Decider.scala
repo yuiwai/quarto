@@ -28,20 +28,41 @@ object SimpleDecider:
         .orElse(quarto.second.hand.headOption)
     def put(quarto: Quarto[F], piece: Piece): F[Option[Pos]] =
       (quarto.nextAll(piece)
-        .foldLeft(RandomDecider.decider.put(quarto, piece), 0) { (acc, r) => 
-          r match             
-            case QuartoResult.Finished(_, _, pos) => Some(pos) -> 5
-            case QuartoResult.Processing(q, pos) => 
-              val score = evalPut(quarto, q, pos)
-              if score > acc._2 then Some(pos) -> score else acc
-            case _ => acc
+        .foldLeft(RandomDecider.decider.put(quarto, piece), 0) { (acc, r) =>
+          r.lastPutPos.map { pos =>
+            val score = evalPut(quarto, r, pos)
+            if score > acc._2 then Some(pos) -> score else acc
+          }.getOrElse(acc)
         }) match
           case (r, _) => r
-    def evalPut(before: Quarto[F], after: Quarto[F], pos: Pos): Score = 
-      if before.linesFromPos(pos).exists(_.isReach) then 3 
-      else if after.linesFromPos(pos).exists(_.isDouble) then 2 
-      else if after.linesFromPos(pos).exists(_.isReach) then -1 
-      else 0
+    def evalPut(before: Quarto[F], result: QuartoResult[F], pos: Pos): Score =
+      result match
+        case QuartoResult.Finished(_, _, _) => 5
+        case QuartoResult.Processing(after, pos) =>
+          if before.linesFromPos(pos).exists(_.isReach) then 3 
+          else if after.linesFromPos(pos).exists(_.isDouble) then 2 
+          else if after.linesFromPos(pos).exists(_.isReach) then -1 
+          else 0
+        case _ => 0
+        
+object RecursiveDecider:
+  type Score = Double
+  type F = [T] =>> T
+  given decider as Decider[F]:
+    def give(quarto: Quarto[F]): Option[Piece] = quarto.second.hand match
+      case hand if hand.nonEmpty =>
+        Some(hand.maxBy(giveImpl(quarto, _, 3)))
+      case _ => None
+    def put(quarto: Quarto[F], piece: Piece): Option[Pos] = quarto.nextAll(piece) match
+      case nextAll if nextAll.nonEmpty =>
+        nextAll.maxBy {
+          case QuartoResult.Finished(_, _, _) => 1.0
+          case QuartoResult.Processing(_, pos) => putImpl(quarto, piece, pos, 3)
+          case _ => 0.5
+        }.lastPutPos
+      case _ => None
+    private def giveImpl(quarto: Quarto[F], piece: Piece, depth: Int): Score = 1.0 // TODO impl
+    private def putImpl(quarto: Quarto[F], piece: Piece, pos: Pos, depth: Int): Score = 1.0 // TODO impl
 
 final case class CompositeDecider[F[_]]
 (black: Decider[F], white: Decider[F])(using F: FlatMap[F]) extends Decider[F]:

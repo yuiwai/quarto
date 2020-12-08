@@ -39,6 +39,10 @@ enum QuartoResult[F[_]]:
   def isFinished: Boolean = this match
     case Finished(_, _, _) => true
     case _ => false
+  def lastPutPos: Option[Pos] = this match
+    case Processing(_, pos) => Some(pos)
+    case Finished(_, _, pos) => Some(pos)
+    case _ => None
 
 object Quarto:
   type Coord = 0 | 1 | 2 | 3
