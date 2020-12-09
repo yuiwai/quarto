@@ -1,8 +1,6 @@
 package com.yuiwai.game.quarto
 
-import com.yuiwai.game.quarto.Quarto.{Board, Coord, Line, Piece, Player, Pos}
-
-import scala.util.Random
+import Quarto._
 
 final case class Quarto[F[_]](
   board: Board,
@@ -30,6 +28,7 @@ final case class Quarto[F[_]](
         case PutResult.AlreadyExists(_) =>
           QuartoResult.Error()
     }.getOrElse(QuartoResult.Error())
+  def pieces: Map[Pos, Piece] = (0 until 16).map(Pos.fromIndex(_)).map(p => p -> board(p)).toMap
 
 enum QuartoResult[F[_]]:
   case Error() // TODO エラーを分類

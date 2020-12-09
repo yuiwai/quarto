@@ -1,8 +1,7 @@
 package com.yuiwai.game.quarto
 
-import com.yuiwai.game.quarto.Quarto.{Coord, Piece, Pos}
-
 import scala.util.Random
+import Quarto._
 
 trait Decider[F[_]]:
   def give(quarto: Quarto[F]): F[Option[Piece]]
@@ -39,12 +38,12 @@ object SimpleDecider:
       result match
         case QuartoResult.Finished(_, _, _) => 5
         case QuartoResult.Processing(after, pos) =>
-          if before.linesFromPos(pos).exists(_.isReach) then 3 
-          else if after.linesFromPos(pos).exists(_.isDouble) then 2 
-          else if after.linesFromPos(pos).exists(_.isReach) then -1 
+          if before.linesFromPos(pos).exists(_.isReach) then 3
+          else if after.linesFromPos(pos).exists(_.isDouble) then 2
+          else if after.linesFromPos(pos).exists(_.isReach) then -1
           else 0
         case _ => 0
-        
+
 object RecursiveDecider:
   type Score = Double
   type F = [T] =>> T
