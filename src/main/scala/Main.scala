@@ -1,5 +1,9 @@
-import com.yuiwai.game.quarto.{Color, CompositeDecider, Decider, Face, Height, PutResult, Quarto, QuartoResult, RandomDecider, RecursiveDecider, Shape, SimpleDecider}
+import com.yuiwai.game.quarto.{Color, CompositeDecider, Decider, Face, FutureWrappedDecider, Height, PutResult, Quarto, QuartoResult, RandomDecider, RecursiveDecider, Shape, SimpleDecider}
 import com.yuiwai.game.quarto.Quarto.{Board, Line, Piece, Pos}
+
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 // TODO 全体的に手番の概念を明確にしたい
 object Main {
@@ -16,6 +20,7 @@ object Main {
     lineSpec
     boardSpec
     quartoSpec
+    asyncDecider
     evaluate(RecursiveDecider.decider, SimpleDecider.decider, 10)
   }
 
@@ -81,6 +86,18 @@ object Main {
       case _ => ???
     // FIXME Option.get
     assert(quarto.nextAll(RandomDecider.decider.give(quarto).get).size == 16)
+    
+    assert(quarto.black.forall(_.isBlack))
+    assert(quarto.white.forall(_.isWhite))
+  }
+  
+  def asyncDecider = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+    given Decider[Future] = FutureWrappedDecider(RandomDecider.decider)
+    val quarto = Quarto.init()
+    val f = runFuture(quarto)
+    val r = Await.result(f, Duration.Inf)
+    println(r)
   }
 
   def checkContainAllPieceOnce(pieces: Iterable[Piece]) =
@@ -99,6 +116,13 @@ object Main {
         case QuartoResult.Processing(q1, _) => run(q1)
         case r as QuartoResult.Finished(_, _, _) => r
         case r => r
+  }
+  
+  def runFuture(q: Quarto[Future]): ExecutionContext ?=> Future[QuartoResult[Future]] = 
+    q.next.flatMap {
+      case QuartoResult.Processing(q1, _) => runFuture(q1)
+      case r as QuartoResult.Finished(_, _, _) => Future.successful(r)
+      case r => Future.successful(r)
     }
   
   def evaluate(black: Decider[[T] =>> T], white: Decider[[T] =>> T], numOfEval: Int = 1000): Unit = {
