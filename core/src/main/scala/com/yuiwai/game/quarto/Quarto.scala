@@ -2,11 +2,16 @@ package com.yuiwai.game.quarto
 
 import Quarto._
 
+import scala.concurrent.{ExecutionContext, Future}
+
+// FIXME QuartoからF[_]を剥がしたい
 final case class Quarto[F[_]](
   board: Board,
   first: Player,
   second: Player)(using decider: Decider[F], F: FlatMap[F]):
   def turn: Option[Color] = second.color
+  def black: Set[Piece] = (first.hand ++ second.hand).filter(_.isBlack).toSet
+  def white: Set[Piece] = (first.hand ++ second.hand).filter(_.isWhite).toSet
   def linesFromPos(pos: Pos): Seq[Line] = Seq(board.hLines(pos.y), board.vLines(pos.x))
   def next: F[QuartoResult[F]] = {
     for {
@@ -178,6 +183,10 @@ object FlatMap:
     def unit[A](a: A): A = a
     def map[A, B](fa: A)(f: A => B): B = f(fa)
     def flatMap[A, B](fa: A)(f: A => B): B = f(fa)
+  given (using ExecutionContext) as FlatMap[Future]:
+    def unit[A](a: A): Future[A] = Future.successful(a)
+    def map[A, B](fa: Future[A])(f: A => B): Future[B] = fa.map(f)
+    def flatMap[A, B](fa: Future[A])(f: A => Future[B]): Future[B] = fa.flatMap(f)
 
 extension[F[_]: FlatMap, A, B](fa: F[A]):
   def map(f: A => B): F[B] = summon[FlatMap[F]].map(fa)(f)
