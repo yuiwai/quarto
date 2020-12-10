@@ -3,6 +3,8 @@ package com.yuiwai.game.quarto
 import scala.util.Random
 import Quarto._
 
+import scala.concurrent.Future
+
 trait Decider[F[_]]:
   def give(quarto: Quarto[F]): F[Option[Piece]]
   def put(quarto: Quarto[F], piece: Piece): F[Option[Pos]]
@@ -66,10 +68,16 @@ object RecursiveDecider:
 final case class CompositeDecider[F[_]]
 (black: Decider[F], white: Decider[F])(using F: FlatMap[F]) extends Decider[F]:
   def give(quarto: Quarto[F]): F[Option[Piece]] = (quarto.turn.map {
-    case Color.Black => black.give(quarto)
-    case Color.White => white.give(quarto)
+    case Color.Black => white.give(quarto)
+    case Color.White => black.give(quarto)
   }).getOrElse(F.unit(None))
   def put(quarto: Quarto[F], piece: Piece): F[Option[Pos]] = quarto.turn.map {
     case Color.Black => black.put(quarto, piece)
     case Color.White => white.put(quarto, piece)
   }.getOrElse(F.unit(None))
+
+final class FutureWrappedDecider(decider: Decider[[T] =>> T]) extends Decider[Future]:
+  def give(quarto: Quarto[Future]): Future[Option[Piece]] = 
+    Future.successful(decider.give(Quarto(quarto.board, quarto.first, quarto.second)(using decider)))
+  def put(quarto: Quarto[Future], piece: Piece): Future[Option[Pos]] =
+    Future.successful(decider.put(Quarto(quarto.board, quarto.first, quarto.second)(using decider), piece))
