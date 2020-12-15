@@ -69,7 +69,7 @@ object Quarto:
   private val PIECE_PATTERNS = 16
   val coords: Seq[Coord] = Seq(0, 1, 2, 3)
 
-  def init[F[_]: Decider : FlatMap](): Quarto =
+  def init(): Quarto =
     apply(
       Board.empty,
       Player.init(Color.Black),
