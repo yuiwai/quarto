@@ -23,6 +23,7 @@ object Main {
   lazy val resetBtn = dom.document.createElement("button").asInstanceOf[HTMLButtonElement]
   private var quarto = Quarto.init()
   private var viewState: ViewState = ViewState.progress(quarto)
+  val operation = QuartoOperation[Future]
   
   def main(args: Array[String]): Unit = init()
   def init(): Unit = {
@@ -46,18 +47,18 @@ object Main {
     draw(viewState)(using ctx)
   }
   
-  def playerGiveHandler(quarto: Quarto[Future], promise: Promise[Option[Piece]]): Unit =
+  def playerGiveHandler(quarto: Quarto, promise: Promise[Option[Piece]]): Unit =
     dom.document.onkeypress = _ => promise.success(quarto.second.hand.headOption)
-  def playerPutHander(quarto: Quarto[Future], piece: Piece, promise: Promise[Option[Pos]]): Unit =
+  def playerPutHander(quarto: Quarto, piece: Piece, promise: Promise[Option[Pos]]): Unit =
     dom.document.onkeypress = _ => promise.success(quarto.board.spaces.headOption)
     
-  def modify(q: Quarto[Future], vs: ViewState): Unit =
+  def modify(q: Quarto, vs: ViewState): Unit =
     quarto = q
     viewState = vs
 
   def update(): Unit = {
     if !viewState.isFinished then
-      quarto.next.map {
+      operation.next(quarto).map {
         case QuartoResult.Processing(q, _) =>
           modify(q, ViewState.progress(q))
           draw(viewState)(using ctx)
@@ -203,22 +204,22 @@ object ViewState:
   enum Phase:
     case GivePiece()
     case PutPiece()
-  def progress(quarto: Quarto[Future]): ViewState =
+  def progress(quarto: Quarto): ViewState =
     ViewState(quarto.pieces, quarto.black, quarto.white, quarto.reaches, None, None)
 
 enum Event:
   case Initialized()
 
 final class PlayerDecider(
-  giveHandler: (quarto: Quarto[Future], promise: Promise[Option[Piece]]) => Unit,
-  putHandler: (quarto: Quarto[Future], piece: Piece, promise: Promise[Option[Pos]]) => Unit)
+  giveHandler: (quarto: Quarto, promise: Promise[Option[Piece]]) => Unit,
+  putHandler: (quarto: Quarto, piece: Piece, promise: Promise[Option[Pos]]) => Unit)
   extends Decider[Future]:
-  def give(quarto: Quarto[Future]): Future[Option[Piece]] = {
+  def give(quarto: Quarto): Future[Option[Piece]] = {
     val promise: Promise[Option[Piece]] = Promise()
     giveHandler(quarto, promise)
     promise.future
   }
-  override def put(quarto: Quarto[Future], piece: Piece): Future[Option[Pos]] = {
+  override def put(quarto: Quarto, piece: Piece): Future[Option[Pos]] = {
     val promise: Promise[Option[Pos]] = Promise()
     putHandler(quarto, piece, promise)
     promise.future

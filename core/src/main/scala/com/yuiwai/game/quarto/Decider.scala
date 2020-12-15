@@ -6,16 +6,16 @@ import Quarto._
 import scala.concurrent.Future
 
 trait Decider[F[_]]:
-  def give(quarto: Quarto[F]): F[Option[Piece]]
-  def put(quarto: Quarto[F], piece: Piece): F[Option[Pos]]
+  def give(quarto: Quarto): F[Option[Piece]]
+  def put(quarto: Quarto, piece: Piece): F[Option[Pos]]
 
 object RandomDecider:
   type F = [T] =>> T
   given decider as Decider[F]:
-    def give(quarto: Quarto[F]): Option[Piece] = {
+    def give(quarto: Quarto): Option[Piece] = {
       quarto.second.hand.lift(new Random().between(0, quarto.second.hand.size))
     }
-    def put(quarto: Quarto[F], piece: Piece): Option[Pos] =
+    def put(quarto: Quarto, piece: Piece): Option[Pos] =
       quarto.board.spaces.lift(new Random().between(0, quarto.board.spaces.size))
 
 object SimpleDecider:
@@ -23,11 +23,11 @@ object SimpleDecider:
   type Score = -1 | 0 | 1 | 2 | 3 | 4 | 5
   given decider as Decider[F]:
     // TODO 評価関数を採用する
-    def give(quarto: Quarto[F]): F[Option[Piece]] =
+    def give(quarto: Quarto): F[Option[Piece]] =
       // TODO 相手が3を作ってしまうコマを渡す
       quarto.second.hand.find(p => !quarto.nextAll(p).exists(_.isFinished))
         .orElse(quarto.second.hand.headOption)
-    def put(quarto: Quarto[F], piece: Piece): F[Option[Pos]] =
+    def put(quarto: Quarto, piece: Piece): F[Option[Pos]] =
       (quarto.nextAll(piece)
         .foldLeft(RandomDecider.decider.put(quarto, piece), 0) { (acc, r) =>
           r.lastPutPos.map { pos =>
@@ -36,7 +36,7 @@ object SimpleDecider:
           }.getOrElse(acc)
         }) match
           case (r, _) => r
-    def evalPut(before: Quarto[F], result: QuartoResult[F], pos: Pos): Score =
+    def evalPut(before: Quarto, result: QuartoResult, pos: Pos): Score =
       result match
         case QuartoResult.Finished(_, _, _) => 5
         case QuartoResult.Processing(after, pos) =>
@@ -50,11 +50,11 @@ object RecursiveDecider:
   type Score = Double
   type F = [T] =>> T
   given decider as Decider[F]:
-    def give(quarto: Quarto[F]): Option[Piece] = quarto.second.hand match
+    def give(quarto: Quarto): Option[Piece] = quarto.second.hand match
       case hand if hand.nonEmpty =>
         Some(hand.maxBy(giveImpl(quarto, _, 3)))
       case _ => None
-    def put(quarto: Quarto[F], piece: Piece): Option[Pos] = quarto.nextAll(piece) match
+    def put(quarto: Quarto, piece: Piece): Option[Pos] = quarto.nextAll(piece) match
       case nextAll if nextAll.nonEmpty =>
         nextAll.maxBy {
           case QuartoResult.Finished(_, _, _) => 1.0
@@ -62,22 +62,22 @@ object RecursiveDecider:
           case _ => 0.5
         }.lastPutPos
       case _ => None
-    private def giveImpl(quarto: Quarto[F], piece: Piece, depth: Int): Score = 1.0 // TODO impl
-    private def putImpl(quarto: Quarto[F], piece: Piece, pos: Pos, depth: Int): Score = 1.0 // TODO impl
+    private def giveImpl(quarto: Quarto, piece: Piece, depth: Int): Score = 1.0 // TODO impl
+    private def putImpl(quarto: Quarto, piece: Piece, pos: Pos, depth: Int): Score = 1.0 // TODO impl
 
 final case class CompositeDecider[F[_]]
 (black: Decider[F], white: Decider[F])(using F: FlatMap[F]) extends Decider[F]:
-  def give(quarto: Quarto[F]): F[Option[Piece]] = (quarto.turn.map {
+  def give(quarto: Quarto): F[Option[Piece]] = (quarto.turn.map {
     case Color.Black => white.give(quarto)
     case Color.White => black.give(quarto)
   }).getOrElse(F.unit(None))
-  def put(quarto: Quarto[F], piece: Piece): F[Option[Pos]] = quarto.turn.map {
+  def put(quarto: Quarto, piece: Piece): F[Option[Pos]] = quarto.turn.map {
     case Color.Black => black.put(quarto, piece)
     case Color.White => white.put(quarto, piece)
   }.getOrElse(F.unit(None))
 
 final class FutureWrappedDecider(decider: Decider[[T] =>> T]) extends Decider[Future]:
-  def give(quarto: Quarto[Future]): Future[Option[Piece]] = 
-    Future.successful(decider.give(Quarto(quarto.board, quarto.first, quarto.second)(using decider)))
-  def put(quarto: Quarto[Future], piece: Piece): Future[Option[Pos]] =
-    Future.successful(decider.put(Quarto(quarto.board, quarto.first, quarto.second)(using decider), piece))
+  def give(quarto: Quarto): Future[Option[Piece]] = 
+    Future.successful(decider.give(quarto))
+  def put(quarto: Quarto, piece: Piece): Future[Option[Pos]] =
+    Future.successful(decider.put(quarto, piece))
