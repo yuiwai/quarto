@@ -34,6 +34,7 @@ final case class Quarto[F[_]](
           QuartoResult.Error()
     }.getOrElse(QuartoResult.Error())
   def pieces: Map[Pos, Piece] = (0 until 16).map(Pos.fromIndex(_)).map(p => p -> board(p)).toMap
+  def reaches: Seq[Line] = board.reaches
 
 enum QuartoResult[F[_]]:
   case Error() // TODO エラーを分類
@@ -135,12 +136,14 @@ object Quarto:
     def isFilled: Boolean = line.forall(_ != EMPTY)
     def isReach: Boolean = line.count(_ != EMPTY) == 3 && line.filter(_ != EMPTY).reduce(_ & _) != 0
     def isDouble: Boolean = line.count(_ != EMPTY) == 2 && line.filter(_ != EMPTY).reduce(_ & _) != 0
+    def contains(piece: Piece): Boolean = line.contains(piece)
 
   extension(board: Board):
     def spaces: Seq[Pos] = board.zipWithIndex.filter(_._1.isEmpty).map(t => Pos.fromIndex(t._2))
     def lines: Seq[Line] = hLines ++ vLines
     def hLines: Seq[Line] = coords.map(hLine(_))
     def vLines: Seq[Line] = coords.map(vLine(_))
+    def reaches: Seq[Line] = lines.filter(_.isReach)
     private def hLine(index: Coord): Line =
       Line(board(Pos(0, index)), board(Pos(1, index)), board(Pos(2, index)), board(Pos(3, index)))
     private def vLine(index: Coord): Line =
