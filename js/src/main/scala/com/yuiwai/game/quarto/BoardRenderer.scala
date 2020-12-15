@@ -12,7 +12,7 @@ object BoardRenderer:
   val unitSize = 50
 
   def drawPiece(pos: Pos, piece: Piece): Ope =
-    drawShape(pos, piece) >> drawHole(pos, piece) >> drawHeight(pos, piece)
+    drawShape(pos, piece) *> drawHole(pos, piece) *> drawHeight(pos, piece)
   def drawPiece(x: Double, y: Double, piece: Piece): Ope = ???
 
   def drawBackground(pos: Pos, piece: Piece, quartoLine: Option[Line], reaches: Seq[Line]): Ope =
@@ -41,11 +41,11 @@ object BoardRenderer:
       case _ => nop()
 
   def drawTile(pos: Pos, piece: Piece, quartoLine: Option[Line], reaches: Seq[Line]): Ope =
-    drawBackground(pos, piece, quartoLine, reaches) >> drawPiece(pos, piece)
+    drawBackground(pos, piece, quartoLine, reaches) *> drawPiece(pos, piece)
 
   def drawHand(hand: Set[Piece]): Ope =
     hand.zipWithIndex.map {
-      case (piece, index) => drawPiece(Pos.fromIndex(index), piece)
+      case (piece, index) => drawPiece(Pos.fromIndex(index), piece).handle(() => println(index))
     }.reduce(_ >> _)
 
   def drawSquare(pos: Pos, size: Double): Ope =

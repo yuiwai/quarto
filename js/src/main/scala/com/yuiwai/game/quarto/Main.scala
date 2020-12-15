@@ -44,6 +44,3 @@ object ViewState:
     case PutPiece()
   def progress(quarto: Quarto): ViewState =
     ViewState(quarto.pieces, quarto.black, quarto.white, quarto.reaches, None, None)
-
-enum Event:
-  case Initialized()

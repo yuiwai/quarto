@@ -1,14 +1,16 @@
 package com.yuiwai.game.quarto
 
 import com.yuiwai.game.quarto.Quarto.{Piece, Pos}
+import com.yuiwai.game.quarto.RenderingOperation.Region
 import org.scalajs.dom
-import org.scalajs.dom.raw.{CanvasRenderingContext2D, HTMLButtonElement, HTMLCanvasElement, HTMLElement}
+import org.scalajs.dom.raw.{CanvasRenderingContext2D, HTMLButtonElement, HTMLCanvasElement, HTMLElement, MouseEvent}
 
 import scala.concurrent.Promise
 
 class QuartoApp[F[_]: Decider : FlatMap](parent: HTMLElement) {
   private var quarto = Quarto.init()
   private var viewState: ViewState = ViewState.progress(quarto)
+  private var regions: Region = Region.Empty
   lazy val canvas = dom.document.createElement("canvas")
     .asInstanceOf[HTMLCanvasElement]
   lazy val ctx =
@@ -29,6 +31,12 @@ class QuartoApp[F[_]: Decider : FlatMap](parent: HTMLElement) {
     parent.appendChild(canvas)
     parent.appendChild(resetBtn)
     draw(viewState)(using ctx)
+    
+    // Regionのテスト
+    canvas.onmousemove = (e: MouseEvent) =>
+      regions.fire(e.clientX - canvas.offsetLeft, e.clientY - canvas.offsetTop)
+    
+    emmit(Event.Initialized())
   }
   
   def reset(): Unit = {
@@ -60,10 +68,9 @@ class QuartoApp[F[_]: Decider : FlatMap](parent: HTMLElement) {
     else ()
   }
   def draw(viewState: ViewState)(using s: State): Unit =
-    drawBoard(viewState)
-    drawHands(viewState)
+    regions = drawBoard(viewState) + drawHands(viewState)
 
-  def drawBoard(viewState: ViewState)(using s: State): Unit = {
+  def drawBoard(viewState: ViewState)(using s: State): Region = {
     import RenderingOperation._
     fillRect(0, 0, 300, 400, "olive").run
     (for {
@@ -73,15 +80,19 @@ class QuartoApp[F[_]: Decider : FlatMap](parent: HTMLElement) {
       piece = viewState.pieces(pos)
     } yield
       strokeStyle("black") >> lineWidth(2) >>
-        BoardRenderer.drawTile(pos, piece, viewState.quartoLine, viewState.reaches)
+        BoardRenderer.drawTile(pos, piece, viewState.quartoLine, viewState.reaches).handle(() => println(pos))
       ).reduce(_ >> _)
   }.run(using s.copy(offset = Offset(50, 100)))
 
-  def drawHands(viewState: ViewState)(using s: State): Unit = {
+  def drawHands(viewState: ViewState)(using s: State): Region = {
     import RenderingOperation._
-    BoardRenderer.drawHand(viewState.black).run(using s.copy(offset = Offset(50, 300)))
+    BoardRenderer.drawHand(viewState.black).run(using s.copy(offset = Offset(50, 300))) +
     BoardRenderer.drawHand(viewState.white).run(using s.copy(offset = Offset(50, 0)))
   }
 
+  def emmit(event: Event): Unit = ???
   def handleEvent(event: Event): Unit = ???
 }
+
+enum Event:
+  case Initialized()
