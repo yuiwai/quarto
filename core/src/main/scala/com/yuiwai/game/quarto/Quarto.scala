@@ -1,29 +1,20 @@
 package com.yuiwai.game.quarto
 
-import Quarto._
+import com.yuiwai.game.quarto.Quarto.{Board, Line, Piece, Player, Pos}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-// FIXME QuartoからF[_]を剥がしたい
-final case class Quarto[F[_]](
+final case class Quarto(
   board: Board,
   first: Player,
-  second: Player)(using decider: Decider[F], F: FlatMap[F]):
+  second: Player):
   def turn: Option[Color] = second.color
   def black: Set[Piece] = (first.hand ++ second.hand).filter(_.isBlack).toSet
   def white: Set[Piece] = (first.hand ++ second.hand).filter(_.isWhite).toSet
   def linesFromPos(pos: Pos): Seq[Line] = Seq(board.hLines(pos.y), board.vLines(pos.x))
-  def next: F[QuartoResult[F]] = {
-    for {
-      pieceOpt <- decider.give(this)
-      posOpt <- pieceOpt.map(decider.put(this, _)).getOrElse(F.unit(None))
-    } yield (pieceOpt, posOpt) match
-      case (Some(piece), Some(pos)) => put(pos, piece)
-      case _ => QuartoResult.Draw(this)
-  }
-  def nextAll(piece: Piece): Set[QuartoResult[F]] =
+  def nextAll(piece: Piece): Set[QuartoResult] =
     board.spaces.toSet.map(put(_, piece))  
-  private def put(pos: Pos, piece: Piece): QuartoResult[F] =
+  def put(pos: Pos, piece: Piece): QuartoResult =
     second.release(piece).map { p =>
       board.put(pos, piece) match
         case PutResult.Success(b) =>
@@ -34,12 +25,13 @@ final case class Quarto[F[_]](
           QuartoResult.Error()
     }.getOrElse(QuartoResult.Error())
   def pieces: Map[Pos, Piece] = (0 until 16).map(Pos.fromIndex(_)).map(p => p -> board(p)).toMap
+  def reaches: Seq[Line] = board.reaches
 
-enum QuartoResult[F[_]]:
+enum QuartoResult:
   case Error() // TODO エラーを分類
-  case Processing(quarto: Quarto[F], pos: Pos)
-  case Draw(quarto: Quarto[F])
-  case Finished(winner: Color, quarto: Quarto[F], pos: Pos)
+  case Processing(quarto: Quarto, pos: Pos)
+  case Draw(quarto: Quarto)
+  case Finished(winner: Color, quarto: Quarto, pos: Pos)
   def isFinished: Boolean = this match
     case Finished(_, _, _) => true
     case _ => false
@@ -47,6 +39,15 @@ enum QuartoResult[F[_]]:
     case Processing(_, pos) => Some(pos)
     case Finished(_, _, pos) => Some(pos)
     case _ => None
+
+class QuartoOperation[F[_]](using decider: Decider[F], F: FlatMap[F]):
+  def next(quarto: Quarto): F[QuartoResult] = 
+    for {
+      pieceOpt <- decider.give(quarto)
+      posOpt <- pieceOpt.map(decider.put(quarto, _)).getOrElse(F.unit(None))
+    } yield (pieceOpt, posOpt) match
+      case (Some(piece), Some(pos)) => quarto.put(pos, piece)
+      case _ => QuartoResult.Draw(quarto)
 
 object Quarto:
   type Coord = 0 | 1 | 2 | 3
@@ -68,7 +69,7 @@ object Quarto:
   private val PIECE_PATTERNS = 16
   val coords: Seq[Coord] = Seq(0, 1, 2, 3)
 
-  def init[F[_]: Decider : FlatMap](): Quarto[F] =
+  def init(): Quarto =
     apply(
       Board.empty,
       Player.init(Color.Black),
@@ -135,12 +136,14 @@ object Quarto:
     def isFilled: Boolean = line.forall(_ != EMPTY)
     def isReach: Boolean = line.count(_ != EMPTY) == 3 && line.filter(_ != EMPTY).reduce(_ & _) != 0
     def isDouble: Boolean = line.count(_ != EMPTY) == 2 && line.filter(_ != EMPTY).reduce(_ & _) != 0
+    def contains(piece: Piece): Boolean = line.contains(piece)
 
   extension(board: Board):
     def spaces: Seq[Pos] = board.zipWithIndex.filter(_._1.isEmpty).map(t => Pos.fromIndex(t._2))
     def lines: Seq[Line] = hLines ++ vLines
     def hLines: Seq[Line] = coords.map(hLine(_))
     def vLines: Seq[Line] = coords.map(vLine(_))
+    def reaches: Seq[Line] = lines.filter(_.isReach)
     private def hLine(index: Coord): Line =
       Line(board(Pos(0, index)), board(Pos(1, index)), board(Pos(2, index)), board(Pos(3, index)))
     private def vLine(index: Coord): Line =

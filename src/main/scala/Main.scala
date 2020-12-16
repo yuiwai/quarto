@@ -1,4 +1,4 @@
-import com.yuiwai.game.quarto.{Color, CompositeDecider, Decider, Face, FutureWrappedDecider, Height, PutResult, Quarto, QuartoResult, RandomDecider, RecursiveDecider, Shape, SimpleDecider}
+import com.yuiwai.game.quarto.{QuartoOperation, Color, CompositeDecider, Decider, Face, FutureWrappedDecider, Height, PutResult, Quarto, QuartoResult, RandomDecider, RecursiveDecider, Shape, SimpleDecider}
 import com.yuiwai.game.quarto.Quarto.{Board, Line, Piece, Pos}
 
 import scala.concurrent.duration.Duration
@@ -76,8 +76,9 @@ object Main {
   def quartoSpec = {
     import com.yuiwai.game.quarto.RandomDecider.given
     val quarto = Quarto.init()
+    val operation = QuartoOperation[[T] =>> T]()
     assert(quarto.turn == Some(Color.White))
-    quarto.next match
+    operation.next(quarto) match
       case QuartoResult.Processing(q1, _) =>
         // 持ち駒が減っている(手番も変わっている)
         assert(q1.first.hand.size == 7)
@@ -111,20 +112,22 @@ object Main {
     assert(pieces.count(p => !p.hasHole && p.isShort && p.isCircle) == 1) // 穴なし, 低, 丸
 
   // 決着まで実行
-  def run(q: Quarto[[T] =>> T]): QuartoResult[[T] =>> T] = {
-      q.next match
-        case QuartoResult.Processing(q1, _) => run(q1)
-        case r as QuartoResult.Finished(_, _, _) => r
-        case r => r
-  }
+  def run(q: Quarto): Decider[[T] =>> T] ?=> QuartoResult = 
+    val operation = QuartoOperation[[T] =>> T]
+    operation.next(q) match
+      case QuartoResult.Processing(q1, _) => run(q1)
+      case r as QuartoResult.Finished(_, _, _) => r
+      case r => r
   
-  def runFuture(q: Quarto[Future]): ExecutionContext ?=> Future[QuartoResult[Future]] = 
-    q.next.flatMap {
+  def runFuture(q: Quarto): (ExecutionContext, Decider[Future]) ?=> Future[QuartoResult] = { 
+    val operation = QuartoOperation[Future]
+    operation.next(q).flatMap {
       case QuartoResult.Processing(q1, _) => runFuture(q1)
       case r as QuartoResult.Finished(_, _, _) => Future.successful(r)
       case r => Future.successful(r)
     }
-  
+  }
+
   def evaluate(black: Decider[[T] =>> T], white: Decider[[T] =>> T], numOfEval: Int = 1000): Unit = {
     given Decider[[T] =>> T] = CompositeDecider(black, white)
     val quarto = Quarto.init()
