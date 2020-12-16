@@ -2,6 +2,9 @@ package com.yuiwai.game.quarto
 
 import org.scalajs.dom.raw.CanvasRenderingContext2D
 
+final case class Offset(x: Double, y: Double)
+object Offset:
+  val zero: Offset = apply(0, 0)
 final case class CanvasRenderingState(ctx: CanvasRenderingContext2D, offset: Offset = Offset.zero)
 
 object RenderingOperation:

@@ -1,6 +1,6 @@
 package com.yuiwai.game.quarto
 
-import Quarto._
+import com.yuiwai.game.quarto.Quarto.{Board, Line, Piece, Player, Pos}
 
 import scala.concurrent.{ExecutionContext, Future}
 
