@@ -1,4 +1,4 @@
-val dottyVersion = "3.0.0-M1"
+val dottyVersion = "3.0.0-M3"
 
 scalaVersion in ThisBuild := dottyVersion
 version in ThisBuild := "0.1.0"

@@ -55,7 +55,7 @@ object BoardRenderer:
     drawPath(arc(pos.x * unitSize + 20, pos.y * unitSize + 20, size / 2, 0, Math.PI * 2))
   def drawPath(o: Ope): Ope = beginPath() >> o >> closePath()
   def withFillColor(color: Color): Ope = fillStyle(color.toStyle)
-  extension(color: Color):
+  extension(color: Color)
     def toStyle: String = color match
       case Color.Black => "black"
       case Color.White => "white"

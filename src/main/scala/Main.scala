@@ -116,14 +116,14 @@ object Main {
     val operation = QuartoOperation[[T] =>> T]
     operation.next(q) match
       case QuartoResult.Processing(q1, _) => run(q1)
-      case r as QuartoResult.Finished(_, _, _) => r
+      case r @ QuartoResult.Finished(_, _, _) => r
       case r => r
   
   def runFuture(q: Quarto): (ExecutionContext, Decider[Future]) ?=> Future[QuartoResult] = { 
     val operation = QuartoOperation[Future]
     operation.next(q).flatMap {
       case QuartoResult.Processing(q1, _) => runFuture(q1)
-      case r as QuartoResult.Finished(_, _, _) => Future.successful(r)
+      case r @ QuartoResult.Finished(_, _, _) => Future.successful(r)
       case r => Future.successful(r)
     }
   }

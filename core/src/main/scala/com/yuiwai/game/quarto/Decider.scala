@@ -11,7 +11,7 @@ trait Decider[F[_]]:
 
 object RandomDecider:
   type F = [T] =>> T
-  given decider as Decider[F]:
+  given decider: Decider[F] with
     def give(quarto: Quarto): Option[Piece] = {
       quarto.second.hand.lift(new Random().between(0, quarto.second.hand.size))
     }
@@ -21,7 +21,7 @@ object RandomDecider:
 object SimpleDecider:
   type F = [T] =>> T
   type Score = -1 | 0 | 1 | 2 | 3 | 4 | 5
-  given decider as Decider[F]:
+  given decider: Decider[F] with
     // TODO 評価関数を採用する
     def give(quarto: Quarto): F[Option[Piece]] =
       // TODO 相手が3を作ってしまうコマを渡す
@@ -49,7 +49,7 @@ object SimpleDecider:
 object RecursiveDecider:
   type Score = Double
   type F = [T] =>> T
-  given decider as Decider[F]:
+  given decider: Decider[F] with
     def give(quarto: Quarto): Option[Piece] = quarto.second.hand match
       case hand if hand.nonEmpty =>
         Some(hand.maxBy(giveImpl(quarto, _, 3)))

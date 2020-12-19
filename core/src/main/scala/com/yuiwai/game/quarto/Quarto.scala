@@ -102,7 +102,7 @@ object Quarto:
     def apply(piece1: Piece, piece2: Piece, piece3: Piece, piece4: Piece): Line =
       Seq(piece1, piece2, piece3, piece4)
 
-  extension(piece: Piece):
+  extension(piece: Piece)
     def color: Color = if isBlack then Color.Black else Color.White
     def hasHole: Boolean = (piece & HAS_HOLE) != 0
     def isTall: Boolean = (piece & IS_TALL) != 0
@@ -126,19 +126,19 @@ object Quarto:
       case Color.Black => piece | IS_BLACK & ~IS_WHITE
       case Color.White => piece | IS_WHITE & ~IS_BLACK
 
-  extension(pos: Pos):
+  extension(pos: Pos)
     def x: Coord = pos._1
     def y: Coord = pos._2
     def toIndex: Int = x + y * LINE_LENGTH
 
-  extension(line: Line):
+  extension(line: Line)
     def isQuarto: Boolean = line.reduce(_ & _) != 0
     def isFilled: Boolean = line.forall(_ != EMPTY)
     def isReach: Boolean = line.count(_ != EMPTY) == 3 && line.filter(_ != EMPTY).reduce(_ & _) != 0
     def isDouble: Boolean = line.count(_ != EMPTY) == 2 && line.filter(_ != EMPTY).reduce(_ & _) != 0
     def contains(piece: Piece): Boolean = line.contains(piece)
 
-  extension(board: Board):
+  extension(board: Board)
     def spaces: Seq[Pos] = board.zipWithIndex.filter(_._1.isEmpty).map(t => Pos.fromIndex(t._2))
     def lines: Seq[Line] = hLines ++ vLines
     def hLines: Seq[Line] = coords.map(hLine(_))
@@ -154,7 +154,7 @@ object Quarto:
       else PutResult.AlreadyExists(pos)
     def apply(pos: Pos): Piece = board(pos.toIndex)
 
-  extension(player: Player):
+  extension(player: Player)
     def hand: Seq[Piece] = player.toSeq
     def color: Option[Color] = player.headOption.map(_.color)
     def release(piece: Piece): Option[Player] =
@@ -182,15 +182,15 @@ trait FlatMap[F[_]]:
   def flatMap[A, B](fa: F[A])(f: A => F[B]): F[B]
 
 object FlatMap:
-  given FlatMap[[T] =>> T]:
+  given FlatMap[[T] =>> T] with
     def unit[A](a: A): A = a
     def map[A, B](fa: A)(f: A => B): B = f(fa)
     def flatMap[A, B](fa: A)(f: A => B): B = f(fa)
-  given (using ExecutionContext) as FlatMap[Future]:
+  given (using ExecutionContext): FlatMap[Future] with
     def unit[A](a: A): Future[A] = Future.successful(a)
     def map[A, B](fa: Future[A])(f: A => B): Future[B] = fa.map(f)
     def flatMap[A, B](fa: Future[A])(f: A => Future[B]): Future[B] = fa.flatMap(f)
 
-extension[F[_]: FlatMap, A, B](fa: F[A]):
+extension[F[_]: FlatMap, A, B](fa: F[A])
   def map(f: A => B): F[B] = summon[FlatMap[F]].map(fa)(f)
   def flatMap(f: A => F[B]): F[B] = summon[FlatMap[F]].flatMap(fa)(f)

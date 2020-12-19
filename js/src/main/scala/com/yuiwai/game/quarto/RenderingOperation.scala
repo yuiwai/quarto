@@ -37,28 +37,30 @@ object RenderingOperation:
       case _ => false
   opaque type Operation = State ?=> Region
   opaque type Point = (Double, Double)
-  def stack(o: Operation): Operation = (using s) => { s.ctx.save(); o; s.ctx.restore(); Region.Empty }
+  def stack(o: Operation): Operation = s ?=> { s.ctx.save(); o; s.ctx.restore(); Region.Empty }
   def clearRect(x: Double, y: Double, w: Double, h: Double): Operation =
-    (using s) => { s.ctx.clearRect(x, y, w, h); Region.Empty }
-  def strokeStyle(v: String): Operation = (using s) => { s.ctx.strokeStyle = v; Region.Empty }
-  def fillStyle(v: String): Operation = (using s) => { s.ctx.fillStyle = v; Region.Empty }
-  def lineWidth(v: Double): Operation = (using s) => { s.ctx.lineWidth = v; Region.Empty }
-  def beginPath(): Operation = (using s) => { s.ctx.beginPath(); Region.Empty }
-  def closePath(): Operation = (using s) => { s.ctx.closePath(); Region.Empty }
-  def stroke(): Operation = (using s) => { s.ctx.stroke(); Region.Empty }
-  def fill(): Operation = (using s) => { s.ctx.fill(); Region.Empty }
-  def rect(x: Double, y: Double, w: Double, h: Double): Operation = (using s) =>
-    stack((using s) => { s.ctx.translate(s.offset.x, s.offset.y); s.ctx.rect(x, y, w, h); Region.Empty })
+    s ?=> { s.ctx.clearRect(x, y, w, h); Region.Empty }
+  def strokeStyle(v: String): Operation = s ?=> { s.ctx.strokeStyle = v; Region.Empty }
+  def fillStyle(v: String): Operation = s ?=> { s.ctx.fillStyle = v; Region.Empty }
+  def lineWidth(v: Double): Operation = s ?=> { s.ctx.lineWidth = v; Region.Empty }
+  def beginPath(): Operation = s ?=> { s.ctx.beginPath(); Region.Empty }
+  def closePath(): Operation = s ?=> { s.ctx.closePath(); Region.Empty }
+  def stroke(): Operation = s ?=> { s.ctx.stroke(); Region.Empty }
+  def fill(): Operation = s ?=> { s.ctx.fill(); Region.Empty }
+  def rect(x: Double, y: Double, w: Double, h: Double): Operation = s ?=> {
+    stack(s ?=> { s.ctx.translate(s.offset.x, s.offset.y); s.ctx.rect(x, y, w, h); Region.Empty })
     Region.Rect((x + s.offset.x, y + s.offset.y), w, h, None)
-  def arc(x: Double, y: Double, r: Double, start: Double, end: Double): Operation = (using s) =>
-    stack((using s) => { s.ctx.translate(s.offset.x, s.offset.y); s.ctx.arc(x, y, r, start, end); Region.Empty }) 
+  }
+  def arc(x: Double, y: Double, r: Double, start: Double, end: Double): Operation = s ?=> {
+    stack(s ?=> { s.ctx.translate(s.offset.x, s.offset.y); s.ctx.arc(x, y, r, start, end); Region.Empty }) 
     Region.Rect((x - r + s.offset.x, y - r + s.offset.y), r * 2, r * 2, None)
-  def nop(): Operation = (using s) => Region.Empty
+  }
+  def nop(): Operation = s ?=> Region.Empty
   def fillRect(x: Double, y: Double, w: Double, h: Double, style: String): Operation =
     fillStyle(style) >> rect(x, y, w, h) >> fill()
-  extension(o: Operation):
-    def *>(o2: Operation): Operation = { (using s) => o * o2 }
-    def >>(o2: Operation): Operation = { (using s) => o + o2 }
+  extension(o: Operation)
+    def *>(o2: Operation): Operation = { s ?=> o * o2 }
+    def >>(o2: Operation): Operation = { s ?=> o + o2 }
     def run: State ?=> Region = o
-    def handle(f: () => Unit): Operation = (using s) =>
+    def handle(f: () => Unit): Operation = s ?=>
       o(using s).setHandler(f)
