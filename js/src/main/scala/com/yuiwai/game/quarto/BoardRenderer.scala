@@ -11,9 +11,9 @@ object BoardRenderer:
   val tileSize = 40
   val unitSize = 50
 
-  def drawPiece(pos: Pos, piece: Piece): Ope =
+  def drawPiece(pos: Pos, piece: Piece, selected: Boolean): Ope =
+    (if selected then fillStyle("green") >> drawSquare(pos, tileSize) >> fill() else nop()) >>
     drawShape(pos, piece) *> drawHole(pos, piece) *> drawHeight(pos, piece)
-  def drawPiece(x: Double, y: Double, piece: Piece): Ope = ???
 
   def drawBackground(pos: Pos, piece: Piece, quartoLine: Option[Line], reaches: Seq[Line]): Ope =
     fillStyle(
@@ -41,11 +41,13 @@ object BoardRenderer:
       case _ => nop()
 
   def drawTile(pos: Pos, piece: Piece, quartoLine: Option[Line], reaches: Seq[Line]): Ope =
-    drawBackground(pos, piece, quartoLine, reaches) *> drawPiece(pos, piece)
+    drawBackground(pos, piece, quartoLine, reaches) *> drawPiece(pos, piece, false)
 
-  def drawHand(hand: Set[Piece]): Ope =
+  def drawHand(hand: Set[Piece], selectedPiece: Option[Piece], handler: Option[(Piece, Int) => Unit]): Ope =
     hand.zipWithIndex.map {
-      case (piece, index) => drawPiece(Pos.fromIndex(index), piece).handle(() => println(index))
+      case (piece, index) => 
+        drawPiece(Pos.fromIndex(index), piece, selectedPiece.contains(piece))
+          .handle(() => handler.foreach(_(piece, index)))
     }.reduce(_ >> _)
 
   def drawSquare(pos: Pos, size: Double): Ope =
