@@ -2,7 +2,7 @@ package com.yuiwai.game.quarto
 
 import com.yuiwai.game.quarto.Quarto.{Piece, Pos}
 
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 
 final class PlayerDecider(emit: Event => Unit) extends Decider[Future]:
   def give(quarto: Quarto): Future[Option[Piece]] =
@@ -11,7 +11,7 @@ final class PlayerDecider(emit: Event => Unit) extends Decider[Future]:
     promise.future
   override def put(quarto: Quarto, piece: Piece): Future[Option[Pos]] =
     val promise: Promise[Option[Pos]] = Promise()
-    emit(Event.PlayerPutHandlerCalled(promise.success(_)))
+    emit(Event.PlayerPutHandlerCalled(piece, promise.success(_)))
     promise.future
 
 final class EventHandledFutureWrappedDecider(decider: Decider[[T] =>> T], emit: Event => Unit) 
